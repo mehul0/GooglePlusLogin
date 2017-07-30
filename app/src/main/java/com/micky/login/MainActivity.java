@@ -6,6 +6,8 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.gms.auth.api.Auth;
@@ -15,6 +17,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInResult;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.SignInButton;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.common.api.Status;
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthCredential;
@@ -23,32 +27,50 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
-public class MainActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener {
+public class MainActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener,View.OnClickListener {
 
     private static final int RC_SIGN_IN = 1;
     private static final String TAG = "login";
 
-    GoogleApiClient mGoogleApiClient;
+    private GoogleApiClient mGoogleApiClient;
     private FirebaseAuth mAuth;
-
     private SignInButton mSignInButton;
+    private TextView tvName,tvEmail;
+    private Button btnLogOut;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        mAuth = FirebaseAuth.getInstance();
-
-        mSignInButton = (SignInButton) findViewById(R.id.sign_in_button);
-        mSignInButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                signIn();
-            }
-        });
-
+        init();
         googleSignIn();
+        loginStatus();
+
+        mSignInButton.setOnClickListener(this);
+
+    }
+
+    public void init(){
+        mAuth = FirebaseAuth.getInstance();
+        mSignInButton = findViewById(R.id.sign_in_button);
+        tvName = findViewById(R.id.tv_name);
+        tvEmail = findViewById(R.id.tv_email);
+        btnLogOut = findViewById(R.id.btn_log_out);
+    }
+
+    public void loginStatus(){
+        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
+        if (user != null) {
+            mSignInButton.setVisibility(View.GONE);
+            tvName.setVisibility(View.VISIBLE);
+            tvEmail.setVisibility(View.VISIBLE);
+            btnLogOut.setVisibility(View.VISIBLE);
+
+            tvName.setText(user.getDisplayName());
+            tvEmail.setText(user.getEmail());
+        }
+
     }
 
     private void googleSignIn(){
@@ -57,7 +79,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
                 .requestIdToken(getString(R.string.default_web_client_id))
                 .requestEmail()
                 .build();
-
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .enableAutoManage(this /* FragmentActivity */, this /* OnConnectionFailedListener */)
                 .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
@@ -72,7 +93,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     @Override
     protected void onStart() {
         super.onStart();
-
         // Check if user is signed in (non-null) and update UI accordingly.
         FirebaseUser currentUser = mAuth.getCurrentUser();
         //updateUI(currentUser);
@@ -86,7 +106,6 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-
         // Result returned from launching the Intent from GoogleSignInApi.getSignInIntent(...);
         if (requestCode == RC_SIGN_IN) {
             GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
@@ -95,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
                 GoogleSignInAccount account = result.getSignInAccount();
                 firebaseAuthWithGoogle(account);
             } else {
+                Toast.makeText(this, "Google signIn failed , please try again", Toast.LENGTH_SHORT).show();
                 // Google Sign In failed, update UI appropriately
                 // ...
             }
@@ -116,9 +136,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
                             if (user != null) {
                                 Toast.makeText(MainActivity.this,
-                                        "Current User  :  " + user
+                                        "Mobile  :  " + user.getPhoneNumber()
                                                 + "\n" + "email : - " + user.getEmail()
                                                 + "\n" + "name  : - " + user.getDisplayName(), Toast.LENGTH_SHORT).show();
+
+                                mSignInButton.setVisibility(View.GONE);
+                                tvName.setVisibility(View.VISIBLE);
+                                tvEmail.setVisibility(View.VISIBLE);
+                                btnLogOut.setVisibility(View.VISIBLE);
+                                tvName.setText(user.getDisplayName());
+                                tvEmail.setText(user.getEmail());
                             }
                             else{
                                 Toast.makeText(MainActivity.this, "User is Null", Toast.LENGTH_SHORT).show();
@@ -137,12 +164,34 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
                 });
     }
 
-    public void signOut(){
+    public void signOut(View view){
+        mSignInButton.setVisibility(View.VISIBLE);
+        tvName.setVisibility(View.GONE);
+        tvEmail.setVisibility(View.GONE);
+        btnLogOut.setVisibility(View.GONE);
+
         FirebaseAuth.getInstance().signOut();
+
+        //mAuth.signOut();
+
+        // Google sign out
+        Auth.GoogleSignInApi.signOut(mGoogleApiClient).setResultCallback(
+                new ResultCallback<Status>() {
+                    @Override
+                    public void onResult(@NonNull Status status) {
+                        //updateUI(null);
+                        Toast.makeText(MainActivity.this, "User Succesfully LogOut ", Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
         Toast.makeText(this, "Google connection is failed ", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
+    public void onClick(View view) {
+        signIn();
     }
 }
